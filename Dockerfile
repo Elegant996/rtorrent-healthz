@@ -1,21 +1,19 @@
-FROM golang:alpine AS builder
+FROM golang:1.20-alpine AS builder
 
-# Set necessary environmet variables needed for our image
-ENV GO111MODULE=on \
-    CGO_ENABLED=0 \
-    GOOS=linux \
-    GOARCH=amd64
+# Set necessary environment variables needed for our image
+ENV VERSION 3.1.0
 
 # Move to working directory /build
 WORKDIR /build
 
-# Copy and download dependency using go mod
-COPY src/go.mod .
-COPY src/go.sum .
-RUN go mod download
+# Install git
+RUN apk add --no-cache git
 
-# Copy the code into the container
-COPY src/. .
+# Clone repo
+RUN git clone -b v${VERSION} --depth 1 https://github.com/Elegant996/rtorrent-healthz .
+
+# Download dependency using go mod
+RUN go mod download
 
 # Build the application
 RUN go build -o main .
