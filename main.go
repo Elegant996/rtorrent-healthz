@@ -42,8 +42,10 @@ func main() {
 	
 	klog.V(2).Infof("SCGI session name: %q", scgiSessionName)
 
-	httpServer(r)
+	done := make(chan bool, 1)
+	go httpServer(r)
 	go removeRegSocket()
+	<-done
 
 	// If RPC server is gracefully shutdown, cleanup and exit
 	os.Exit(0)
@@ -67,7 +69,7 @@ func httpServer(r *rpcCodec) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`ok`))
 			klog.V(5).Infof("health check succeeded")
-		} else {
+		} else if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
 			klog.Errorf("health check failed: %+v", err)
@@ -78,7 +80,7 @@ func httpServer(r *rpcCodec) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`ok`))
 			klog.V(5).Infof("session save succeeded")
-		} else {
+		} else if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
 			klog.Errorf("session save failed: %+v", err)
