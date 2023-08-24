@@ -25,18 +25,12 @@ RUN if [ -z "${VERSION}" ]; then \
 RUN go mod download
 
 # Build the application
-RUN go build -o main .
-
-# Move to /dist directory as the place for resulting binary folder
-WORKDIR /dist
-
-# Copy binary from build to main folder
-RUN cp /build/main .
+RUN go build -o healthz .
 
 # Build a small image
 FROM scratch
 
-COPY --from=builder /dist/main /
+COPY --from=builder /build/healthz /
 
 # Command to run
-ENTRYPOINT ["/main"]
+ENTRYPOINT ["/healthz"]
