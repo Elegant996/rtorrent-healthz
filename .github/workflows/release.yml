@@ -7,26 +7,18 @@ on:
 
 jobs:
   docker:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     permissions:
       packages: write
       contents: read
 
-    strategy:
-      fail-fast: true
-      matrix:
-        arch: ["amd64"]
-        include:
-          - arch: amd64
-            os: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
 
-    - name: Get the version
-      id: get_version
-      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\/v/}
+    - name: Get the tag
+      id: get_tag
+      run: echo ::set-output name=TAG::${GITHUB_REF/refs\/tags\/v/}
 
     # - name: Set up QEMU
     #   run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -48,8 +40,9 @@ jobs:
     - name: Publish to GitHub Container Registry
       uses: docker/build-push-action@v4
       with:
+        build-args: |
+          TAG=${{ steps.get_tag.outputs.TAG }}
         context: .
-        platforms: linux/${{ matrix.arch }}
         push: true
         tags: |
-          ghcr.io/${{ steps.image_id.outputs.ID }}:${{ steps.get_version.outputs.VERSION }}
+          ghcr.io/${{ steps.image_id.outputs.ID }}:${{ steps.get_tag.outputs.TAG }}
