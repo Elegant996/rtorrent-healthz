@@ -9,7 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/klog/v2"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // Command line flags
@@ -18,29 +19,43 @@ var (
 	scgiAddress         = flag.String("scgi-address", "/run/scgi/socket", "Path of the SCGI server socket that the rtorrent-healthz will connect to.")
 	httpEndpoint        = flag.String("http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including SCGI server health check and save requests. The default is empty string, which means the server is disabled.")
 	encoding            = flag.String("encoding", "xml", "The encoding mechanism used for remote procedure calling.")
+	debug 				= flag.Bool("debug", false, "Sets the log level to debug")
 
 	// List of supported versions
 	supportedVersions = []string{"0.9.8"}
 )
 
 func main() {
-	klog.InitFlags(nil)
-	flag.Set("logtostderr", "true")
 	flag.Parse()
 
-	klog.Infof("Running rtorrent-healthz with encoding=%s", *encoding)
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+    if *debug {
+        zerolog.SetGlobalLevel(zerolog.DebugLevel)
+    }
+
+	log.Info().
+		Str("encoding", *encoding).
+		Msgf("Running rtorrent-healthz with encoding=%s", *encoding)
 
 	r := newRPCCodec()
+	ctx, cancel := context.WithTimeout(context.Background(), *operationTimeout)
+	defer cancel()
 
-	klog.V(1).Infof("Calling SCGI server to discover session name")
+	log.Info().
+		Msg("Calling SCGI server to discover session name")
 
 	var scgiSessionName string
-	if err := r.Call(context.Background(), "session.name", nil, &scgiSessionName); err != nil {
-		klog.Errorf("error retrieving SCGI session name: %v", err)
+	if err := r.Call(ctx, "session.name", nil, &scgiSessionName); err != nil {
+		log.Error().
+			Err(err).
+			Str("session", scgiSessionName).
+			Msg("Cannot rerieve SCGI session name")
 		os.Exit(1)
 	}
 	
-	klog.V(2).Infof("SCGI session name: %q", scgiSessionName)
+	log.Info().
+		Str("session", scgiSessionName).
+		Msg("SCGI session name captured")
 
 	done := make(chan bool, 1)
 	go httpServer(r)
@@ -53,10 +68,14 @@ func main() {
 
 func httpServer(r *rpcCodec) {
 	if *httpEndpoint == "" {
-		klog.Infof("Skipping HTTP server because endpoint is set to: %q", *httpEndpoint)
+		log.Info().
+			Str("endpoint", *httpEndpoint).
+			Msg("Skipping HTTP server")
 		return
 	}
-	klog.Infof("Starting HTTP server at endpoint: %v\n", *httpEndpoint)
+	log.Info().
+		Str("endpoint", *httpEndpoint).
+		Msg("Starting HTTP server")
 
 	ctx, cancel := context.WithTimeout(context.Background(), *operationTimeout)
 	defer cancel()
@@ -68,26 +87,34 @@ func httpServer(r *rpcCodec) {
 		if err := r.Call(ctx, "system.api_version", nil, &result); err != nil {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`ok`))
-			klog.V(5).Infof("health check succeeded")
+			log.Debug().
+				Msg("Health check succeeded")
 		} else if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			klog.Errorf("health check failed: %+v", err)
+			log.Debug().
+				Err(err).
+				Msg("Health check failed")
 		}
 	})
 	mux.HandleFunc("/save", func(w http.ResponseWriter, req *http.Request) {
 		if err := r.Call(context.Background(), "session.save", nil, &result); err != nil {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`ok`))
-			klog.V(5).Infof("session save succeeded")
+			log.Debug().
+				Msg("Session save succeeded")
 		} else if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			klog.Errorf("session save failed: %+v", err)
+			log.Debug().
+				Err(err).
+				Msg("Session save failed")
 		}
 	})
 
-	klog.Fatal(http.ListenAndServe(*httpEndpoint, mux))
+	log.Fatal().
+		Err(http.ListenAndServe(*httpEndpoint, mux)).
+		Msg("HTTP server closed")
 }
 
 func removeRegSocket() {
@@ -96,7 +123,10 @@ func removeRegSocket() {
 	<-sigc
 	err := os.Remove(*scgiAddress)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("failed to remove socket: %s with error: %+v", *scgiAddress, err)
+		log.Error().
+			Err(err).
+			Str("socket", *scgiAddress).
+			Msg("Failed to remove socket")
 		os.Exit(1)
 	}
 	os.Exit(0)
