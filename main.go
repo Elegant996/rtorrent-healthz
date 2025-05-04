@@ -81,7 +81,7 @@ func httpServer(r *rpcCodec) {
 	var result any
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
-		if err := r.Call(ctx, "system.api_version", nil, &result); err != nil {
+		if err := r.Call(ctx, "system.pid", nil, &result); err != nil {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`ok`))
 			log.Debug().
