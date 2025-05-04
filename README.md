@@ -5,9 +5,8 @@ Sidecar container for rTorrent. Allows healthchecks and sessions saves (on exit)
 
 Docker
 -----------------------------------------------
-You may download a pre-compiled version through the GitHub Container Registry using any of the below:
+You may pull a pre-compiled container image of `caddy` embedded with this module through any of the [tagged images](https://github.com/Elegant996/rtorrent-healthz/pkgs/container/scgi-transport) on the GitHub Container Registry or using the `latest` tag below:
 
 ```
-docker pull ghcr.io/elegant996/rtorrent-healthz:3.1.2
 docker pull ghcr.io/elegant996/rtorrent-healthz:latest
 ```
