@@ -3,7 +3,7 @@ FROM golang:1.24-alpine AS builder
 COPY . ./src
 
 # Build the application
-RUN go build -o dist/healthz .
+RUN go build -o /dist/healthz ./src
 
 # Build a small image
 FROM scratch
