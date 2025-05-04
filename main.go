@@ -45,7 +45,7 @@ func main() {
 	if err := r.Call(ctx, "session.name", nil, &scgiSessionName); err != nil {
 		log.Error().
 			Err(err).
-			Str("session", scgiSessionName).
+			Str("session", "").
 			Msg("Cannot rerieve SCGI session name")
 		os.Exit(1)
 	}
