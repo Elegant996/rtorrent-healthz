@@ -6,7 +6,7 @@ COPY . ./
 RUN go mod download
 
 # Build the application
-RUN go build -o dist/healthz .
+RUN go build -o /dist/healthz .
 
 # Build a small image
 FROM scratch
