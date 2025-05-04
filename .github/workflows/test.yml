@@ -30,7 +30,7 @@ jobs:
 
       - name: Initiate build
         run: |
-          go build -o dist/main .
+          go build -o dist/healthz .
 
       - name: Approve PR
         if: github.event_name == 'pull_request'
