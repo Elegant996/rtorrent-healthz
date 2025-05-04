@@ -1,6 +1,6 @@
 module main
 
-go 1.20
+go 1.24
 
 require (
 	github.com/Elegant996/scgi v1.0.0
