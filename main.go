@@ -20,9 +20,6 @@ var (
 	httpEndpoint        = flag.String("http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including SCGI server health check and save requests. The default is empty string, which means the server is disabled.")
 	encoding            = flag.String("encoding", "xml", "The encoding mechanism used for remote procedure calling.")
 	debug 				= flag.Bool("debug", false, "Sets the log level to debug")
-
-	// List of supported versions
-	supportedVersions = []string{"0.9.8"}
 )
 
 func main() {
