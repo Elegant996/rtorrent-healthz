@@ -35,7 +35,7 @@ func main() {
 		Msgf("Running rtorrent-healthz with encoding=%s", *encoding)
 
 	r := newRPCCodec()
-	ctx, cancel := context.WithTimeout(context.Background(), *operationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
 	defer cancel()
 
 	log.Info().
