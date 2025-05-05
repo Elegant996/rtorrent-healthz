@@ -9,8 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"go.uber.org/zap"
 )
 
 // Command line flags
@@ -19,43 +18,50 @@ var (
 	scgiAddress         = flag.String("scgi-address", "/run/scgi/socket", "Path of the SCGI server socket that the rtorrent-healthz will connect to.")
 	httpEndpoint        = flag.String("http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including SCGI server health check and save requests. The default is empty string, which means the server is disabled.")
 	encoding            = flag.String("encoding", "xml", "The encoding mechanism used for remote procedure calling.")
-	debug 				= flag.Bool("debug", false, "Sets the log level to debug")
+	debug               = flag.Bool("debug", false, "Sets the log level to debug")
 )
+
+var logger *zap.Logger
 
 func main() {
 	flag.Parse()
 
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-    if *debug {
-        zerolog.SetGlobalLevel(zerolog.DebugLevel)
-    }
+	logger = zap.Must(zap.NewProduction())
+	if *debug {
+		logger = zap.Must(zap.NewDevelopment())
+	}
+	defer logger.Sync()
 
-	log.Info().
-		Str("encoding", *encoding).
-		Msgf("Running rtorrent-healthz with encoding=%s", *encoding)
+	logger.Info("Running rtorrent-healthz",
+		zap.String("encoding", *encoding),
+	)
 
-	r := newRPCCodec()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
+	// https://dev.to/synexismicrosystem/contextual-logging-keep-tracks-execution-flow-265e
+	// http://www.vilain.net/2016/11/using-gos-context-library-for-logging/
+	// https://learningdaily.dev/understanding-contexts-in-go-fd79c320b448
+	// ctx := context.WithValue(context.Background(), loggerKey, logger)
+	ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
 	defer cancel()
 
-	log.Info().
-		Msg("Calling SCGI server to discover session name")
+	codec := newRPCCodec()
+
+	logger.Info("Calling SCGI server to discover session name")
 
 	var scgiSessionName string
-	if err := r.Call(ctx, "session.name", nil, &scgiSessionName); err != nil {
-		log.Error().
-			Err(err).
-			Str("session", "").
-			Msg("Cannot rerieve SCGI session name")
+	if err := codec.Call(ctx, "session.name", nil, &scgiSessionName); err != nil {
+		logger.Error("Cannot rerieve SCGI session name",
+			zap.String("session", ""),
+			zap.Error(err),
+		)
 		os.Exit(1)
 	}
 	
-	log.Info().
-		Str("session", scgiSessionName).
-		Msg("SCGI session name captured")
+	logger.Info("SCGI session name captured",
+		zap.String("session", scgiSessionName),
+	)
 
 	done := make(chan bool, 1)
-	go httpServer(r)
+	go httpServer(codec)
 	go removeRegSocket()
 	<-done
 
@@ -63,55 +69,50 @@ func main() {
 	os.Exit(0)
 }
 
-func httpServer(r *rpcCodec) {
+func httpServer(c *rpcCodec) {
 	if *httpEndpoint == "" {
-		log.Info().
-			Str("endpoint", *httpEndpoint).
-			Msg("Skipping HTTP server")
+		logger.Info("Skipping HTTP server",
+			zap.String("endpoint", *httpEndpoint),
+		)
 		return
 	}
-	log.Info().
-		Str("endpoint", *httpEndpoint).
-		Msg("Starting HTTP server")
-
-	ctx, cancel := context.WithTimeout(context.Background(), *operationTimeout)
-	defer cancel()
+	logger.Info("Starting HTTP server",
+		zap.String("endpoint", *httpEndpoint),
+	)
 
 	// Prepare http endpoint for healthz
 	var result any
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
-		if err := r.Call(ctx, "system.pid", nil, &result); err != nil {
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if err := c.Call(r.Context(), "system.pid", nil, &result); err != nil {			
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`ok`))
-			log.Debug().
-				Msg("Health check succeeded")
+			w.Write([]byte("ok"))
+			logger.Debug("Health check succeeded")
 		} else if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			log.Debug().
-				Err(err).
-				Msg("Health check failed")
+			logger.Debug("Health check failed",
+				zap.Error(err),
+			)
 		}
 	})
-	mux.HandleFunc("/save", func(w http.ResponseWriter, req *http.Request) {
-		if err := r.Call(context.Background(), "session.save", nil, &result); err != nil {
+	mux.HandleFunc("/save", func(w http.ResponseWriter, r *http.Request) {
+		if err := c.Call(r.Context(), "session.save", nil, &result); err != nil {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`ok`))
-			log.Debug().
-				Msg("Session save succeeded")
+			w.Write([]byte("ok"))
+			logger.Debug("Session save succeeded")
 		} else if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			log.Debug().
-				Err(err).
-				Msg("Session save failed")
+			logger.Debug("Session save failed",
+				zap.Error(err),
+			)
 		}
 	})
 
-	log.Fatal().
-		Err(http.ListenAndServe(*httpEndpoint, mux)).
-		Msg("HTTP server closed")
+	logger.Fatal("HTTP server closed",
+		zap.Error(http.ListenAndServe(*httpEndpoint, mux)),
+	)
 }
 
 func removeRegSocket() {
@@ -120,10 +121,10 @@ func removeRegSocket() {
 	<-sigc
 	err := os.Remove(*scgiAddress)
 	if err != nil && !os.IsNotExist(err) {
-		log.Error().
-			Err(err).
-			Str("socket", *scgiAddress).
-			Msg("Failed to remove socket")
+		logger.Error("Failed to remove socket",
+			zap.Error(err),
+			zap.String("socket", *scgiAddress),
+		)
 		os.Exit(1)
 	}
 	os.Exit(0)
