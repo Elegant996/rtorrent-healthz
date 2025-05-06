@@ -29,6 +29,7 @@ func main() {
 	logger = zap.Must(zap.NewProduction())
 	if *debug {
 		logger = zap.Must(zap.NewDevelopment())
+		logger.Debug("Debugging enabled")
 	}
 	defer logger.Sync()
 
