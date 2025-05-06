@@ -14,11 +14,11 @@ import (
 
 // Command line flags
 var (
-	operationTimeout = flag.Duration("timeout", time.Second, "Timeout for waiting for communication with rtorrent.")
-	scgiAddress      = flag.String("scgi-address", "/run/scgi/socket", "Path of the SCGI server socket that the rtorrent-healthz will connect to.")
-	httpEndpoint     = flag.String("http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including SCGI server health check and save requests. The default is empty string, which means the server is disabled.")
-	encoding         = flag.String("encoding", "xml", "The encoding mechanism used for remote procedure calling.")
-	debug            = flag.Bool("debug", false, "Sets the log level to debug")
+	probeTimeout = flag.Duration("probe-timeout", time.Second, "Probe timeout in seconds.")
+	scgiAddress  = flag.String("scgi-address", "/run/scgi/socket", "Path of the SCGI server socket that the rtorrent-healthz will connect to.")
+	httpEndpoint = flag.String("http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including SCGI server health check and save requests. The default is empty string, which means the server is disabled.")
+	encoding     = flag.String("encoding", "xml", "The encoding mechanism used for remote procedure calling.")
+	debug        = flag.Bool("debug", false, "Sets the log level to debug.")
 )
 
 var logger *zap.Logger
@@ -36,7 +36,7 @@ func main() {
 		zap.String("encoding", *encoding),
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), *operationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), *probeTimeout)
 	defer cancel()
 
 	client := newClientCodec()
