@@ -4,36 +4,38 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/creachadair/jrpc2"
-	"github.com/creachadair/jrpc2/jhttp"
 	"github.com/Elegant996/scgi"
 	"github.com/Elegant996/xmlrpc"
+	"github.com/creachadair/jrpc2"
+	"github.com/creachadair/jrpc2/jhttp"
 )
 
-// rpcCodec contains an RPC client with the desired encoding
-type rpcCodec struct {
-	client interface{}
+// clientCodec contains an RPC encoder with the desired encoding
+type clientCodec struct {
+	enc interface{}
 }
 
 // newRPCCodec returns an initialized rpcCodec instance
-func newRPCCodec() *rpcCodec {
+func newClientCodec() *clientCodec {
+	client := &http.Client{}
+	client.Transport = scgi.NewRoundTripper(logger)
+
 	switch *encoding {
 	case "json":
-		ch		:= jhttp.NewChannel(*scgiAddress, &jhttp.ChannelOptions{Client: &http.Client{Transport: &scgi.Transport{}}})
-		c		:= jrpc2.NewClient(ch, nil)
-		return &rpcCodec{client: c}
+		c := jrpc2.NewClient(jhttp.NewChannel(*scgiAddress, &jhttp.ChannelOptions{Client: client}), nil)
+		return &clientCodec{enc: c}
 	default: // xml
-		c, _	:= xmlrpc.NewClient(*scgiAddress, &scgi.Transport{})
-		return &rpcCodec{client: c}
+		c, _ := xmlrpc.NewClient(*scgiAddress, client.Transport)
+		return &clientCodec{enc: c}
 	}
 }
 
 // Call is the RPC invoked with desired encoding mechanism
-func (r *rpcCodec) Call(ctx context.Context, method string, params any, result any) error {
-	switch r.client.(type) {
+func (c *clientCodec) Call(ctx context.Context, method string, params any, result any) error {
+	switch c.enc.(type) {
 	case *jrpc2.Client:
-		return r.client.(*jrpc2.Client).CallResult(ctx, method, []string{""}, result)
+		return c.enc.(*jrpc2.Client).CallResult(ctx, method, []string{""}, result)
 	default: // *xmlrpc.Client
-		return r.client.(*xmlrpc.Client).Call(ctx, method, params, result)
+		return c.enc.(*xmlrpc.Client).Call(ctx, method, params, result)
 	}
 }
