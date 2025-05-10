@@ -2,8 +2,8 @@ github.com/Elegant996/scgi v1.3.3 h1:Kjh0SfrHEb8bQJNMh3JFE89GD8Do48mdd1KRhyq7sKM
 github.com/Elegant996/scgi v1.3.3/go.mod h1:453XoflhDecL+RA3VPYp1SWHXQBauDvNklP/tQf3T+0=
 github.com/Elegant996/xmlrpc v0.0.0-20200426092339-6d7edd4ac412 h1:KH4fiMxWbUjnUQcrXllraAGyFcg0+qVmefHiMiDQUQM=
 github.com/Elegant996/xmlrpc v0.0.0-20200426092339-6d7edd4ac412/go.mod h1:SU61e8UkMJD44Mh+YsNIwgzfU7fHn01hLosqSmteKVs=
-github.com/creachadair/jrpc2 v1.0.0 h1:MJecUFNbda24o0Qa4CYru5NJvs6BEnmzupdAx3f7+98=
-github.com/creachadair/jrpc2 v1.0.0/go.mod h1:VNiDz7Qbua37RrefUJdMki9dVmsbrQPIQOPy907UvtE=
+github.com/creachadair/jrpc2 v1.3.1 h1:4B2R9050CYdhCKepbFVWQVG0/EFqRa9MuuM1Thd7tZo=
+github.com/creachadair/jrpc2 v1.3.1/go.mod h1:GtMp2RXHMnrdOY8hWWlbBpjWXSVDXhuO/LMRJAtRFno=
 github.com/creachadair/mds v0.24.2 h1:J3EUS8nUP33t8XZ8N5SqNtOVQFHJ4ntz0MjesASbU3Y=
 github.com/creachadair/mds v0.24.2/go.mod h1:ArfS0vPHoLV/SzuIzoqTEZfoYmac7n9Cj8XPANHocvw=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
