@@ -42,6 +42,7 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		logger.Error("Health check failed",
+			zap.String("session", h.sessionName),
 			zap.Error(err),
 		)
 		return
@@ -49,7 +50,28 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`ok`))
-	logger.Debug("Health check succeeded")
+	logger.Debug("Health check succeeded",
+		zap.String("session", h.sessionName),
+	)
+}
+
+func (h *healthProbe) startProbe(w http.ResponseWriter, req *http.Request) {
+	var result any
+	if err := h.client.Call(req.Context(), "system.session", nil, &result); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		logger.Error("Error acquiring SCGI session",
+			zap.Error(err),
+			zap.String("session", h.sessionName),
+		)
+		return
+	}
+	h.sessionName = result.(string)
+
+	w.WriteHeader(http.StatusOK)
+	logger.Info("SCGI session acquired",
+		zap.String("session", h.sessionName),
+	)
 }
 
 func main() {
@@ -73,35 +95,17 @@ func main() {
 		addr = net.JoinHostPort("0.0.0.0", defaultHealthzPort)
 	}
 
-	ctx := context.Background()
 	client := newClientCodec()
 
-	logger.Info("Calling SCGI server to discover session name")
-
-	// Connect to the SCGI server without any timeout to avoid crashing the probe when the server is not ready yet.
-	// Goal: liveness probe never crashes, it only fails the probe when the server is not available (yet).
-	// Since a http server for the probe is not running at this point, Kubernetes liveness probe will fail immediately
-	// with "connection refused", which is good enough to fail the probe.
-	var sessionName string
-	if err := client.Call(ctx, "session.name", nil, &sessionName); err != nil {
-		logger.Error("Cannot rerieve SCGI session name",
-			zap.String("session", ""),
-			zap.Error(err),
-		)
-		os.Exit(1)
-	}
-	logger.Info("SCGI session name captured",
-		zap.String("session", sessionName),
-	)
-
 	hp := &healthProbe{
-		sessionName: sessionName,
+		sessionName: "",
 		client:      client,
 	}
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", hp.checkProbe)
+	mux.HandleFunc("/readyz", hp.startProbe)
 	logger.Info("ServeMux listening",
 		zap.String("address", addr),
 	)
