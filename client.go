@@ -12,7 +12,7 @@ import (
 
 // clientCodec contains an RPC encoder with the desired encoding
 type clientCodec struct {
-	enc interface{}
+	enc any
 }
 
 // newRPCCodec returns an initialized rpcCodec instance
@@ -31,11 +31,13 @@ func newClientCodec() *clientCodec {
 }
 
 // Call is the RPC invoked with desired encoding mechanism
-func (c *clientCodec) Call(ctx context.Context, method string, params any, result any) error {
+func (c *clientCodec) Call(ctx context.Context, method string, params any, result any) (err error) {
 	switch c.enc.(type) {
 	case *jrpc2.Client:
-		return c.enc.(*jrpc2.Client).CallResult(ctx, method, []string{""}, result)
+		_, err = c.enc.(*jrpc2.Client).Call(ctx, method, params)
 	default: // *xmlrpc.Client
-		return c.enc.(*xmlrpc.Client).Call(ctx, method, params, result)
+		err = c.enc.(*xmlrpc.Client).Call(ctx, method, params, result)
 	}
+
+	return
 }
