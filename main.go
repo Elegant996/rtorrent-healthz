@@ -15,7 +15,6 @@ import (
 
 const (
 	defaultHealthzPort = "9808"
-	retryDelay         = 2 * time.Second
 )
 
 // Command line flags
@@ -24,7 +23,6 @@ var (
 	scgiAddress  = flag.String("scgi-address", "/run/scgi/socket", "Path of the SCGI server socket that the rtorrent-healthz will connect to.")
 	httpEndpoint = flag.String("http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including SCGI server health check and save requests. The default is empty string, which means the server is disabled.")
 	encoding     = flag.String("encoding", "xml", "The encoding mechanism used for remote procedure calling.")
-	maxRetries   = flag.Int("max-retries", 3, "The number of attempts to make to acquire the SCGI session.")
 	debug        = flag.Bool("debug", false, "Sets the log level to debug.")
 )
 
@@ -85,26 +83,14 @@ func main() {
 	// Since a http server for the probe is not running at this point, Kubernetes liveness probe will fail immediately
 	// with "connection refused", which is good enough to fail the probe.
 	var sessionName string
-	for i := range *maxRetries {
-		if err := client.Call(ctx, "session.name", nil, &sessionName); err != nil {
-			logger.Info("Error acquiring SCGI session",
-				zap.Int("retry", i+1),
-				zap.Int("maxRetries", *maxRetries),
-				zap.Error(err),
-			)
-			time.Sleep(retryDelay)
-		}
-	}
-
-	// Max retries reached; exit
-	if sessionName == "" {
-		logger.Error("Failed to acquire SCGI session",
-			zap.Int("retries", *maxRetries),
+	if err := client.Call(ctx, "session.name", nil, &sessionName); err != nil {
+		logger.Error("Cannot rerieve SCGI session name",
+			zap.String("session", ""),
+			zap.Error(err),
 		)
 		os.Exit(1)
 	}
-
-	logger.Info("SCGI session name acquired",
+	logger.Info("SCGI session name captured",
 		zap.String("session", sessionName),
 	)
 
