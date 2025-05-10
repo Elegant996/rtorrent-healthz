@@ -57,7 +57,7 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 
 func (h *healthProbe) startProbe(w http.ResponseWriter, req *http.Request) {
 	var result any
-	if err := h.client.Call(req.Context(), "system.session", nil, &result); err != nil {
+	if err := h.client.Call(req.Context(), "session.name", nil, &result); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		logger.Error("Error acquiring SCGI session",
