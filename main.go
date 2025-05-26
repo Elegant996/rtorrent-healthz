@@ -77,11 +77,14 @@ func (h *healthProbe) startProbe(w http.ResponseWriter, req *http.Request) {
 func main() {
 	flag.Parse()
 
-	logger = zap.Must(zap.NewProduction())
+	loggerCfg := zap.NewProductionConfig()
 	if *debug {
-		logger = zap.Must(zap.NewDevelopment())
-		logger.Debug("Debugging enabled")
+		loggerCfg = zap.NewDevelopmentConfig()
 	}
+	loggerCfg.EncoderConfig.TimeKey = "timestamp"
+	loggerCfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
+	logger = zap.Must(loggerCfg.Build())
+
 	defer logger.Sync()
 
 	logger.Info("Running rtorrent-healthz",
