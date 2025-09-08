@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 const (
 	defaultHealthzPort = "9808"
+	retryInterval      = 2 * time.Second
 )
 
 // Command line flags
@@ -56,20 +58,19 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 	)
 }
 
-func (h *healthProbe) startProbe(w http.ResponseWriter, req *http.Request) {
+func (h *healthProbe) getSessionName() {
+	logger.Info("Calling SCGI server to discover session name")
+
 	var result any
-	if err := h.client.Call(req.Context(), "session.name", nil, &result); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		logger.Error("Error acquiring SCGI session",
+	ctx, cancel := context.WithTimeout(context.Background(), *probeTimeout)
+	if err := client.Call(ctx, "session.name", nil, &result); err != nil {
+		logger.Info("Failed to acquire SCGI session",
 			zap.Error(err),
 			zap.String("session", h.sessionName),
 		)
-		return
 	}
 	h.sessionName = result.(string)
 
-	w.WriteHeader(http.StatusOK)
 	logger.Info("SCGI session acquired",
 		zap.String("session", h.sessionName),
 	)
@@ -99,17 +100,39 @@ func main() {
 		addr = net.JoinHostPort("0.0.0.0", defaultHealthzPort)
 	}
 
+	// Loop until SCGI socket has been created
+	for {
+		if sockInfo, err := os.Stat(*scgiAddress); err != nil {
+			if os.IsNotExist(err) {
+				logger.Info("Waiting for SCGI address...",
+					zap.Error(err),
+					zap.String("socket", *scgiAddress),
+				)
+				time.Sleep(retryInterval)
+				continue
+			}
+			break
+		}
+		if sockInfo.Mode().Type() != os.ModeSocket {
+			logger.Error("SCGI address is not valid; exiting...",
+				zap.Error(err),
+				zap.String("socket", *scgiAddress),
+			)
+			os.Exit(1)
+		}
+	}
+
 	client := newClientCodec()
 
 	hp := &healthProbe{
 		sessionName: "",
 		client:      client,
 	}
+	hp.getSessionName()
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", hp.checkProbe)
-	mux.HandleFunc("/readyz", hp.startProbe)
 	logger.Info("ServeMux listening",
 		zap.String("address", addr),
 	)
