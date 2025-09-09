@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -45,8 +44,8 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		logger.Error("Health check failed",
-			zap.String("session", h.sessionName),
 			zap.Error(err),
+			zap.String("session", h.sessionName),
 		)
 		return
 	}
@@ -54,6 +53,7 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`ok`))
 	logger.Debug("Health check succeeded",
+		zap.String("pid", result),
 		zap.String("session", h.sessionName),
 	)
 }
@@ -62,8 +62,7 @@ func (h *healthProbe) getSessionName() {
 	logger.Info("Calling SCGI server to discover session name")
 
 	var result any
-	ctx, cancel := context.WithTimeout(context.Background(), *probeTimeout)
-	if err := client.Call(ctx, "session.name", nil, &result); err != nil {
+	if err := client.Call(context.Background(), "session.name", nil, &result); err != nil {
 		logger.Info("Failed to acquire SCGI session",
 			zap.Error(err),
 			zap.String("session", h.sessionName),
@@ -111,14 +110,14 @@ func main() {
 				time.Sleep(retryInterval)
 				continue
 			}
+			if sockInfo.Mode().Type() != os.ModeSocket {
+				logger.Error("SCGI address is not valid; exiting...",
+					zap.Error(err),
+					zap.String("socket", *scgiAddress),
+				)
+				os.Exit(1)
+			}
 			break
-		}
-		if sockInfo.Mode().Type() != os.ModeSocket {
-			logger.Error("SCGI address is not valid; exiting...",
-				zap.Error(err),
-				zap.String("socket", *scgiAddress),
-			)
-			os.Exit(1)
 		}
 	}
 
