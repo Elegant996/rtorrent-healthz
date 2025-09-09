@@ -53,7 +53,7 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`ok`))
 	logger.Debug("Health check succeeded",
-		zap.String("pid", result),
+		zap.String("pid", result.(string)),
 		zap.String("session", h.sessionName),
 	)
 }
@@ -62,7 +62,7 @@ func (h *healthProbe) getSessionName() {
 	logger.Info("Calling SCGI server to discover session name")
 
 	var result any
-	if err := client.Call(context.Background(), "session.name", nil, &result); err != nil {
+	if err := h.client.Call(context.Background(), "session.name", nil, &result); err != nil {
 		logger.Info("Failed to acquire SCGI session",
 			zap.Error(err),
 			zap.String("session", h.sessionName),
