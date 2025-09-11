@@ -16,12 +16,11 @@ import (
 
 const (
 	defaultHealthzPort = "9808"
-	retryInterval      = 2 * time.Second
 )
 
 // Command line flags
 var (
-	probeTimeout = flag.Duration("probe-timeout", time.Second, "Probe timeout in seconds.")
+	probeTimeout = flag.Duration("probe-timeout", 5*time.Second, "Probe timeout in seconds.")
 	scgiAddress  = flag.String("scgi-address", "/run/scgi/socket", "Path of the SCGI server socket that the rtorrent-healthz will connect to.")
 	httpEndpoint = flag.String("http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including SCGI server health check and save requests. The default is empty string, which means the server is disabled.")
 	encoding     = flag.String("encoding", "xml", "The encoding mechanism used for remote procedure calling.")
@@ -31,8 +30,7 @@ var (
 var logger *zap.Logger
 
 type healthProbe struct {
-	sessionName string
-	client      *clientCodec
+	client *clientCodec
 }
 
 func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
@@ -40,12 +38,11 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 	defer cancel()
 
 	var result any
-	if err := h.client.Call(ctx, "system.pid", nil, &result); err != nil {
+	if err := h.client.Call(ctx, "session.name", nil, &result); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		logger.Error("Health check failed",
 			zap.Error(err),
-			zap.String("session", h.sessionName),
 		)
 		return
 	}
@@ -53,25 +50,7 @@ func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`ok`))
 	logger.Debug("Health check succeeded",
-		zap.String("pid", result.(string)),
-		zap.String("session", h.sessionName),
-	)
-}
-
-func (h *healthProbe) getSessionName() {
-	logger.Info("Calling SCGI server to discover session name")
-
-	var result any
-	if err := h.client.Call(context.Background(), "session.name", nil, &result); err != nil {
-		logger.Info("Failed to acquire SCGI session",
-			zap.Error(err),
-			zap.String("session", h.sessionName),
-		)
-	}
-	h.sessionName = result.(string)
-
-	logger.Info("SCGI session acquired",
-		zap.String("session", h.sessionName),
+		zap.String("session", result.(string)),
 	)
 }
 
@@ -99,43 +78,15 @@ func main() {
 		addr = net.JoinHostPort("0.0.0.0", defaultHealthzPort)
 	}
 
-	// Loop until SCGI socket has been created
-	for {
-		if sockInfo, err := os.Stat(*scgiAddress); err != nil {
-			if os.IsNotExist(err) {
-				logger.Info("Waiting for SCGI address...",
-					zap.Error(err),
-					zap.String("socket", *scgiAddress),
-				)
-				time.Sleep(retryInterval)
-				continue
-			}
-			if sockInfo.Mode().Type() != os.ModeSocket {
-				logger.Error("SCGI address is not valid; exiting...",
-					zap.Error(err),
-					zap.String("socket", *scgiAddress),
-				)
-				os.Exit(1)
-			}
-			break
-		}
-	}
-
-	client := newClientCodec()
-
 	hp := &healthProbe{
-		sessionName: "",
-		client:      client,
+		client: newClientCodec(),
 	}
-	hp.getSessionName()
 
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/healthz", hp.checkProbe)
 	logger.Info("ServeMux listening",
 		zap.String("address", addr),
 	)
-
 	logger.Fatal("Failed to start http server",
 		zap.Error(http.ListenAndServe(addr, mux)),
 	)

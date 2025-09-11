@@ -34,7 +34,7 @@ func newClientCodec() *clientCodec {
 func (c *clientCodec) Call(ctx context.Context, method string, params any, result any) (err error) {
 	switch c.enc.(type) {
 	case *jrpc2.Client:
-		err = c.enc.(*jrpc2.Client).CallResult(ctx, method, []string{""}, result)
+		err = c.enc.(*jrpc2.Client).CallResult(ctx, method, []any{params}, result)
 	default: // *xmlrpc.Client
 		err = c.enc.(*xmlrpc.Client).Call(ctx, method, params, result)
 	}
