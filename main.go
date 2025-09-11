@@ -78,6 +78,10 @@ func main() {
 		addr = net.JoinHostPort("0.0.0.0", defaultHealthzPort)
 	}
 
+	hp := &healthProbe{
+		client: newClientCodec(),
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", hp.checkProbe)
 	logger.Info("ServeMux listening",
