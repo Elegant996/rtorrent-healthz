@@ -2,6 +2,8 @@ module main
 
 go 1.25
 
+toolchain go1.25.1
+
 require (
 	github.com/Elegant996/scgi v1.3.4
 	github.com/Elegant996/xmlrpc v0.0.0-20250507185234-9c3a24fe374b
