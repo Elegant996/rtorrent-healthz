@@ -30,7 +30,7 @@ var (
 var logger *zap.Logger
 
 type healthProbe struct {
-	client *clientCodec
+	client clientCodec
 }
 
 func (h *healthProbe) checkProbe(w http.ResponseWriter, req *http.Request) {
